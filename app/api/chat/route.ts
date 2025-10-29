@@ -1,6 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
+interface ConversationMessage {
+  role: 'user' | 'model';
+  parts: Array<{ text: string }>;
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('API route called');
@@ -21,10 +26,13 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Prepare the prompt with context
-    let prompt = message;
-    
     // Add system context
+    const historyText = conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0
+      ? conversationHistory.map((msg: ConversationMessage) => 
+          `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.parts[0]?.text || ''}`
+        ).join('\n\n')
+      : 'No previous conversation.';
+    
     const systemContext = `You are an expert stock analyst AI assistant. You have access to real-time stock data and market information.
 ${stockData ? `Current Stock Data: ${JSON.stringify(stockData)}` : ''}
 
@@ -33,9 +41,7 @@ Always include appropriate disclaimers about investment risks and that this is n
 Be conversational but professional in your response.
 
 Previous conversation:
-${conversationHistory?.map(msg => 
-  `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.parts[0].text}`
-).join('\n\n') || 'No previous conversation.'}
+${historyText}
 
 Current question: ${message}`;
 
